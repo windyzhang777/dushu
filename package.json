@@ -1,0 +1,27 @@
+{
+  "name": "dushu",
+  "type": "module",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "pnpm --filter @dushu/web dev",
+    "dev:native": "pnpm --filter @dushu/native dev",
+    "dev:server": "pnpm --filter @dushu/server dev",
+    "dev:shared": "pnpm --filter @dushu/shared dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "nuclear": "rm -rf node_modules **/*/node_modules pnpm-lock.yaml package-lock.json packages/*/dist packages/*/*.tsbuildinfo apps/native/.expo"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.0",
+    "eslint-plugin-turbo": "^2.9.14",
+    "globals": "^17.6.0",
+    "turbo": "^2.9.14",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.46.4"
+  }
+}

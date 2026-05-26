@@ -1,0 +1,68 @@
+# dependencies
+node_modules
+
+.pnpm-store
+
+# local env files
+.env
+.env.*
+
+# Build
+dist
+build
+
+# Uploads
+uploads/
+
+coverage
+
+.vite
+.expo
+.expo-shared
+.DS_Store
+
+# typescript
+*.tsbuildinfo
+
+
+# packages/*/dist
+
+# # Native
+# .kotlin/
+# *.orig.*
+# *.jks
+# *.p8
+# *.p12
+# *.key
+# *.mobileprovision
+
+
+# # Metro
+# .metro-health-check*
+
+# # debug
+# npm-debug.*
+# yarn-debug.*
+# yarn-error.*
+
+# # macOS
+# .DS_Store
+# *.pem
+
+# # local env files
+# .env*.local
+
+# # typescript
+# *.tsbuildinfo
+
+# # generated native folders
+# /ios
+# /android
+
+# # local
+# .env
+# local.*
+# packages/server/uploads
+
+# # not ready
+# # packages/native
