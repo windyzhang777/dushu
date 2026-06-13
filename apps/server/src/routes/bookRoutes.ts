@@ -2,6 +2,7 @@ import {
   demoBook,
   demoEpub,
   demoPdf,
+  demoTxt,
   type Bookmark,
   type BookRecord,
   type BookSummary,
@@ -24,7 +25,11 @@ const bookProcessor = new BookProcessorService(UPLOAD_DIR);
 
 const books = new Map<string, BookRecord>([[demoBook.id, demoBook]]);
 
-const renditionByBookId: Record<string, RenditionDescriptor> = { [demoBook.id]: demoBook.kind === 'epub' ? demoEpub : demoPdf };
+const demoRenditions: Record<string, RenditionDescriptor> = { epub: demoEpub, pdf: demoPdf, txt: demoTxt };
+
+const renditionByBookId: Record<string, RenditionDescriptor> = {
+  ...(demoRenditions[demoBook.kind] ? { [demoBook.id]: demoRenditions[demoBook.kind] } : {}),
+};
 
 export const addBook = (book: BookRecord) => {
   books.set(book.id, book);

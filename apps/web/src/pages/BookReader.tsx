@@ -11,6 +11,7 @@ import { titleWithAuthor, type ReadingProgress } from '@dushu/shared';
 import { BookOpen } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { getReaderUnits } from './utils';
 
 export const BookReader = () => {
   const navigate = useNavigate();
@@ -23,72 +24,161 @@ export const BookReader = () => {
   const updateProgress = useUpdateProgress(id!);
   const { settings, updateSettings, resetSettings } = useReaderSettings();
 
-  const [currentChapter, setCurrentChapter] = useState(-1);
+  const [currentBatchIndex, setCurrentBatchIndex] = useState(-1);
   const [tocOpen, setTocOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const book = bookData?.book;
   const rendition = renditionData?.rendition;
-  const isEpub = rendition?.kind === 'epub';
-  const chapters = isEpub ? rendition.spine : [];
-  const totalChapters = chapters.length;
+  const units = getReaderUnits(rendition);
+  const totalUnits = units.length;
   const lineProgress = progressData?.progress?.lineProgress ?? 0;
-  const chapterTitle = chapters[currentChapter]?.title;
+  const currentUnitTitle = units[currentBatchIndex]?.title;
   const isLoading = loadingBook || loadingRendition;
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const chaptersRef = useRef(chapters);
-  chaptersRef.current = chapters; // keep latest chapters in ref for progress saving
-
-  const navigateChapter = useCallback(
-    (index: number) => {
-      if (index < 0 || index >= totalChapters) return;
-      setCurrentChapter(index);
-      setTocOpen(false);
-    },
-    [totalChapters],
-  );
-
-  const prevChapter = useCallback(() => navigateChapter(currentChapter - 1), [currentChapter]);
-  const nextChapter = useCallback(() => navigateChapter(currentChapter + 1), [currentChapter]);
+  const scrollProgtessTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const unitsRef = useRef(units);
+  unitsRef.current = units; // keep latest units in ref for progress saving
 
   const navigateBack = (replace: boolean = false) => {
     // flushUpdate();
     navigate('/', { replace });
   };
 
-  // Set initial chapter index from saved progress
-  useEffect(() => {
-    if (currentChapter >= 0) return; // already set
-    if (!totalChapters) return;
-    const locator = progressData?.progress?.locator;
-    if (locator?.kind === 'epub' && locator.spineIndex < totalChapters) {
-      setCurrentChapter(locator.spineIndex);
-    } else {
-      setCurrentChapter(0);
-    }
-  }, [totalChapters, progressData, currentChapter]);
+  const buildProgressPayload = useCallback(
+    (progress: number): ReadingProgress | undefined => {
+      if (!rendition || !id) return;
 
-  // Save progress when chapter changes
+      const safeProgress = Math.max(0, Math.min(1, progress));
+      if (currentBatchIndex < 0 || currentBatchIndex >= totalUnits) return;
+
+      switch (rendition.kind) {
+        case 'epub':
+          return {
+            locator: {
+              kind: 'epub',
+              spineIndex: currentBatchIndex,
+              href: units[currentBatchIndex]?.href ?? '',
+              progression: safeProgress,
+              sentenceIndex: 0,
+            },
+            lineProgress: safeProgress,
+            updatedAt: new Date().toISOString(),
+          };
+        case 'pdf':
+          return {
+            locator: {
+              kind: 'pdf',
+              page: Math.max(1, currentBatchIndex + 1),
+            },
+            lineProgress: safeProgress,
+            updatedAt: new Date().toISOString(),
+          };
+        case 'txt':
+          return {
+            locator: {
+              kind: 'txt',
+              segmentIndex: Math.max(0, currentBatchIndex),
+            },
+            lineProgress: safeProgress,
+            updatedAt: new Date().toISOString(),
+          };
+        case 'mobi':
+          return {
+            locator: {
+              kind: 'mobi',
+              chapterIndex: Math.max(0, currentBatchIndex),
+              position: Math.max(0, currentBatchIndex),
+              progression: safeProgress,
+            },
+            lineProgress: safeProgress,
+            updatedAt: new Date().toISOString(),
+          };
+        default:
+          return;
+      }
+    },
+    [rendition, id, currentBatchIndex, totalUnits, units],
+  );
+
+  const navigateUnit = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= totalUnits) return;
+
+      setCurrentBatchIndex(index);
+      setTocOpen(false);
+    },
+    [totalUnits],
+  );
+
+  const prevUnit = useCallback(() => navigateUnit(currentBatchIndex - 1), [navigateUnit, currentBatchIndex]);
+  const nextUnit = useCallback(() => navigateUnit(currentBatchIndex + 1), [navigateUnit, currentBatchIndex]);
+
+  const handleScrollProgress = useCallback(
+    (progress: number) => {
+      console.log(`progress :`, progress);
+      if (!id) return;
+
+      clearTimeout(scrollProgtessTimeoutRef.current);
+      scrollProgtessTimeoutRef.current = setTimeout(() => {
+        const payload = buildProgressPayload(progress);
+        if (!payload) return;
+        updateProgress.mutate(payload);
+      }, 1000);
+    },
+    [id, buildProgressPayload, updateProgress],
+  );
+
+  // Set initial unit index from saved progress
   useEffect(() => {
-    if (!id || !totalChapters || currentChapter < 0) return;
+    if (!totalUnits || currentBatchIndex >= 0) return; // no units oralready set
+
+    const locator = progressData?.progress?.locator;
+    if (!locator) {
+      setCurrentBatchIndex(0);
+      return;
+    }
+
+    if (locator?.kind === 'epub' && locator.kind === 'epub' && locator.spineIndex < totalUnits) {
+      setCurrentBatchIndex(locator.spineIndex);
+      return;
+    }
+
+    if (locator?.kind === 'pdf' && locator.kind === 'pdf' && locator.page > 0 && locator.page <= totalUnits) {
+      setCurrentBatchIndex(locator.page - 1);
+      return;
+    }
+
+    if (locator?.kind === 'txt' && locator.kind === 'txt' && locator.segmentIndex < totalUnits) {
+      setCurrentBatchIndex(locator.segmentIndex);
+      return;
+    }
+
+    if (locator?.kind === 'mobi' && locator.kind === 'mobi' && locator.chapterIndex < totalUnits) {
+      setCurrentBatchIndex(locator.chapterIndex);
+      return;
+    }
+
+    setCurrentBatchIndex(0);
+  }, [totalUnits, progressData, currentBatchIndex, rendition]);
+
+  // Save progress when current unit changes
+  useEffect(() => {
+    if (!id || !totalUnits || currentBatchIndex < 0) return;
+
     clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
-      const progress: ReadingProgress = {
-        locator: {
-          kind: 'epub',
-          spineIndex: currentChapter,
-          href: chaptersRef.current[currentChapter]?.href ?? '',
-          progression: 0,
-          sentenceIndex: 0,
-        },
-        lineProgress: 0, // TODO: update from speech progress
-        updatedAt: new Date().toISOString(),
-      };
+      const progress = buildProgressPayload(lineProgress);
+      if (!progress) return;
       updateProgress.mutate(progress);
     }, 1000);
     return () => clearTimeout(timeoutRef.current);
-  }, [id, totalChapters, currentChapter]);
+  }, [id, totalUnits, currentBatchIndex, lineProgress, buildProgressPayload, updateProgress]);
+
+  useEffect(() => {
+    return () => clearTimeout(scrollProgtessTimeoutRef.current);
+  }, []);
 
   // Hijack keyboard navigation
   useEffect(() => {
@@ -98,16 +188,16 @@ export const BookReader = () => {
         setTocOpen(false);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        nextChapter();
+        nextUnit();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        prevChapter();
+        prevUnit();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tocOpen, nextChapter, prevChapter]);
+  }, [tocOpen, nextUnit, prevUnit]);
 
   if (isLoading) {
     return (
@@ -145,9 +235,9 @@ export const BookReader = () => {
       {/* Header */}
       <BookHeader
         title={titleWithAuthor(book.title, book.author)}
-        chapterTitle={chapterTitle}
-        chapterIndex={currentChapter}
-        totalChapters={totalChapters}
+        unitTitle={currentUnitTitle}
+        unitIndex={currentBatchIndex}
+        totalUnits={totalUnits}
         onBack={() => navigateBack(false)}
         onToggleToc={() => setTocOpen((v) => !v)}
         onToggleSettings={() => setSettingsOpen((v) => !v)}
@@ -159,14 +249,14 @@ export const BookReader = () => {
         max={100}
         step={1}
         onValueChange={(values) => {
-          // TODO: jump to sentence
-          const progress: ReadingProgress = {
-            locator: isEpub
-              ? { kind: 'epub', spineIndex: currentChapter, href: chapters[currentChapter]?.href ?? '', progression: 0, sentenceIndex: 0 }
-              : { kind: 'txt', segmentIndex: 0 },
-            lineProgress: values[0] / 100,
-            updatedAt: new Date().toISOString(),
-          };
+          const fraction = values[0] / 100;
+          // Navigate to the unit corresponding to the position
+          const targetUnit = Math.min(Math.floor(fraction * totalUnits), totalUnits - 1);
+          if (targetUnit >= 0 && targetUnit !== currentBatchIndex) {
+            navigateUnit(targetUnit);
+          }
+          const progress = buildProgressPayload(fraction);
+          if (!progress) return;
           updateProgress.mutate(progress);
         }}
         className="z-20"
@@ -181,19 +271,27 @@ export const BookReader = () => {
               rendition.toc.length > 0
                 ? rendition.toc
                 : rendition.spine.map((chapter, index) => ({
-                    id: `ch-${index}}`,
+                    id: `ch-${index}`,
                     label: chapter.title || `Chapter ${index + 1}`,
                     locator: { kind: 'epub', spineIndex: index, href: chapter.href, progression: 0, sentenceIndex: 0 },
                   }))
             }
-            currentChapter={currentChapter}
-            onSelect={navigateChapter}
+            currentUnitIndex={currentBatchIndex}
+            onSelect={navigateUnit}
           />
         )}
 
         <div className="w-full h-full">
           {/* Chapter iframe */}
-          {rendition.kind === 'epub' && <ReaderEpub bookId={id} rendition={rendition} currentChapter={currentChapter} settings={settings} />}
+          {rendition.kind === 'epub' && (
+            <ReaderEpub
+              bookId={id}
+              rendition={rendition}
+              currentUnitIndex={currentBatchIndex}
+              settings={settings}
+              onScrollProgress={handleScrollProgress}
+            />
+          )}
 
           {rendition.kind === 'txt' && <ReaderTxt bookId={id} rendition={rendition} settings={settings} />}
         </div>

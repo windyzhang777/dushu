@@ -5,12 +5,6 @@ export interface BaseLocator {
   kind: BookKind;
 }
 
-export interface TextLocator extends BaseLocator {
-  kind: 'txt';
-  segmentIndex: number;
-  offset?: number;
-}
-
 export interface EpubLocator extends BaseLocator {
   kind: 'epub';
   spineIndex: number;
@@ -28,6 +22,12 @@ export interface PdfLocator extends BaseLocator {
   zoom?: number;
 }
 
+export interface TextLocator extends BaseLocator {
+  kind: 'txt';
+  segmentIndex: number;
+  offset?: number;
+}
+
 export interface MobiLocator extends BaseLocator {
   kind: 'mobi';
   position: number;
@@ -35,7 +35,7 @@ export interface MobiLocator extends BaseLocator {
   progression?: number;
 }
 
-export type Locator = TextLocator | EpubLocator | PdfLocator | MobiLocator;
+export type Locator = EpubLocator | PdfLocator | TextLocator | MobiLocator;
 
 // ------- Annotations ---------------------------------------------------------------
 export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'orange' | 'purple';

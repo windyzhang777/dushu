@@ -14,12 +14,74 @@ function extractBody(html: string): string {
   return match ? match[1] : html;
 }
 
-export function buildSrcDoc(html: string, bookId: string, setting: ReaderSettings, isDark: boolean): string {
+export function buildChapterFragment(html: string, bookId: string): string {
   let bodyContent = extractBody(html);
   // Strip width/height on svg/img/image so CSS controls sizing and aspect ratio
   bodyContent = bodyContent.replace(/<(svg|img|image)\b([^>]*)/gi, (_match) => _match.replace(/\s(width|height)="[^"]*"/gi, ''));
-  const rewritten = rewriteResourceUrls(bodyContent, bookId);
+  return rewriteResourceUrls(bodyContent, bookId);
+}
+
+export function buildSrcDoc(html: string, bookId: string, setting: ReaderSettings, isDark: boolean, initialUnitIndex: number = 0): string {
+  const rewritten = buildChapterFragment(html, bookId);
   const colorScheme = isDark ? 'dark' : 'light';
+  const isScrollMode = setting.pageView === 'scroll';
+  const bodyOverflow = isScrollMode ? 'auto' : 'hidden';
+  const bodyHeight = '100%';
+  const bodyMinHeight = 'auto';
+
+  const script = isScrollMode
+    ? `
+      (() => {
+        let sentNearBottom = false;
+        const getScrollRoot = () => document.body;
+
+        const emitScrollSignals = () => {
+          const root = getScrollRoot();
+          if (!root) return;
+
+          const maxScroll = Math.max(1, root.scrollHeight - root.clientHeight);
+          const progress = root.scrollTop / maxScroll;
+          parent.postMessage({ type: 'reader-scroll-progress', progress }, '*');
+
+          // Emit near-bottom signal when within 200px of the end
+          const nearBottom = root.scrollHeight - (root.scrollTop + root.clientHeight) < 200;
+          if (nearBottom && !sentNearBottom) {
+            parent.postMessage({ type: 'reader-near-bottom' }, '*');
+            sentNearBottom = true;
+          } else if (!nearBottom) {
+            sentNearBottom = false;
+          }
+        };
+
+        window.addEventListener('scroll', emitScrollSignals, { passive: true });
+        document.addEventListener('scroll', emitScrollSignals, { passive: true });
+        document.body.addEventListener('scroll', emitScrollSignals, { passive: true });
+
+        window.addEventListener('message', (event) => {
+          const data = event.data;
+          if (!data || typeof data !== 'object') return;
+
+          if (data.type === 'reader-append-unit' && typeof data.unitIndex === 'number' && typeof data.html === 'string') {
+            const section = document.createElement('section');
+            section.id = 'unit-' + data.unitIndex;
+            section.dataset.unit = String(data.unitIndex);
+            section.innerHTML = data.html;
+            document.body.appendChild(section);
+            sentNearBottom = false; // reset so next scroll check can fire again
+            parent.postMessage({ type: 'reader-unit-appended', unitIndex: data.unitIndex }, '*');
+            requestAnimationFrame(emitScrollSignals);
+          }
+
+          if (data.type === 'reader-scroll-to-unit' && typeof data.unitIndex === 'number') {
+            const section = document.getElementById('unit-' + data.unitIndex);
+            section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+
+        requestAnimationFrame(emitScrollSignals);
+      })();
+      `
+    : '';
 
   return `
     <!doctype html>
@@ -40,8 +102,9 @@ export function buildSrcDoc(html: string, bookId: string, setting: ReaderSetting
           }
           body {
             padding: 0 clamp(12rem,10vw,20rem);
-            height: 100%;
-            overflow-y: auto;
+            height: ${bodyHeight};
+            min-height: ${bodyMinHeight};
+            overflow-y: ${bodyOverflow};
             font-family: ${setting.fontFamily};
             font-size: ${setting.fontSize}px;
             line-height: ${setting.lineHeight};
@@ -76,7 +139,10 @@ export function buildSrcDoc(html: string, bookId: string, setting: ReaderSetting
           }
         </style>
       </head>
-      <body>${rewritten}</body>
+      <body>
+        <section id="unit-${initialUnitIndex}" data-unit="${initialUnitIndex}">${rewritten}</section>
+      </body>
+      ${script ? `<script>${script}</script>` : ''}
     </html>
   `;
 }
