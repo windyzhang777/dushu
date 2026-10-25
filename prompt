@@ -1,0 +1,341 @@
+Project Brief: A Cross-Platform Digital Book Reader and Listening App
+
+1. Product Vision
+
+Build a polished, modern digital reading application inspired by the best experiences in Speechify, 微信读书 (Weixin Dushu), Readwise Reader, and other established reading apps.
+
+The product combines a personal digital library, faithful document rendering, customizable reading, synchronized text-to-speech, and persistent bookmarks, highlights, and notes.
+
+The primary goal is to let users import their own books or paste arbitrary text, then read or listen to that content comfortably across devices.
+
+This is not intended to be a clone of any single existing product. Use established products as inspiration for their user experience and capabilities while developing a coherent, distinctive application.
+
+The product should ultimately support macOS/web and iPhone, with a foundation for future cloud synchronization, AI assistance, premium voices, and community features.
+
+2. Working Principles
+
+* Make sensible engineering and UX decisions independently. Avoid asking for approval for every small implementation detail.
+* Prioritize a cohesive, working product over a large collection of disconnected demo features.
+* Preserve the original document’s appearance wherever fidelity is important.
+* Keep document rendering, speech playback, reading position, annotations, and library management logically independent so that interacting with one does not unnecessarily interrupt another.
+* Design for both large and small screens. Do not simply shrink the desktop interface to fit a phone.
+* Prefer maintainable, well-supported libraries and standards over reinventing complex document-rendering functionality.
+* Avoid unnecessary complexity, premature infrastructure, and overengineering.
+* Distinguish implemented functionality from placeholders. Do not represent a disabled or simulated feature as a working capability.
+* Make reasonable assumptions where requirements are open-ended and document important trade-offs.
+
+3. Technology Direction
+
+Preferred technologies:
+
+* TypeScript throughout the application where practical.
+* React and Vite for the web application.
+* React Native with Expo as the preferred direction for a native iPhone application.
+* Node.js and TypeScript for the backend.
+* TanStack Query for server state, API caching, and request lifecycle management.
+* A lightweight client-state solution, such as Zustand or an equivalent, for transient UI and reader state.
+* Appropriate local persistence for books, annotations, preferences, and reading progress.
+* A relational database and object storage when cloud functionality is introduced.
+
+Choose the most suitable document-rendering and speech technologies based on actual platform capabilities. Candidates include EPUB.js for EPUB rendering and Mozilla PDF.js for PDF rendering.
+
+Do not force EPUB, PDF, and plain text into a single rendering approach.
+
+The first stage may prioritize a responsive web application that works well in desktop browsers on macOS and mobile browsers. Structure the codebase so a native iPhone application can follow without duplicating all business logic.
+
+Before choosing a monorepo structure, backend framework, database, or additional dependencies, inspect the existing repository and select an approach proportional to the project.
+
+4. Stage One: Build a Functional Reading Prototype
+
+Stage One is the primary implementation target. Deliver a complete, usable reading workflow rather than merely creating a UI mockup.
+
+A. Library and book import
+
+Users should be able to:
+
+* Upload multiple files in one operation from their local device.
+* Import at least TXT, EPUB, and PDF files.
+* Paste arbitrary text into an input area and turn it into a temporary book.
+* Import books through a clear, discoverable workflow, including appropriate drag-and-drop support on desktop.
+* See each imported book appear on the shelf immediately, with a pending, processing, completed, or failed state as appropriate.
+* Track progress independently for each file during multi-file import.
+* Open successfully imported books and understand why an unsupported or invalid file failed.
+* Rename a book, delete it from the library, and change its cover using an image selected by the user.
+* View available book metadata and correct it when appropriate.
+* Avoid duplicate library entries when the same content is imported more than once, with a reasonable option to keep or replace an existing copy.
+
+Pasted text should become a first-class, reflowable book that can be read, annotated, bookmarked, and listened to just like an imported text book.
+
+Temporary books should have clear lifecycle behavior. Do not silently discard a user’s content or annotations.
+
+B. Document fidelity and rendering
+
+Treat document fidelity as a core product requirement.
+
+EPUB
+
+Preserve the source book’s structure and styling as far as the format and renderer allow, including chapter hierarchy, headings, paragraph structure, indentation, embedded fonts, images, and distinct heading typography.
+
+Offer optional reader themes and typography adjustments without permanently modifying the original file. Where an override conflicts with the source styling, choose behavior that makes reading comfortable while retaining a way to restore the original appearance.
+
+PDF
+
+Display the original PDF pages, preserving page geometry, images, columns, typography, and layout. Do not convert the PDF into a reflowable text document for its primary display.
+
+Support appropriate zoom, page navigation, single-page and double-page viewing where practical, and scrolling. Use a selectable text layer when available so users can select text, highlight passages, and initiate speech.
+
+Recognize that scanned PDFs may require OCR before text selection or synchronized speech becomes available. Handle that limitation honestly and leave room for a future OCR capability.
+
+TXT and pasted text
+
+Provide a clean, reflowable reading experience with customizable typography, paragraph spacing, line height, and themes.
+
+Design the document layer so additional formats, including MOBI or other supported e-book formats, can be introduced later through format-specific importers or conversion pipelines. Do not promise perfect fidelity for formats whose original rendering behavior cannot be reliably reproduced.
+
+C. Reader interface and navigation
+
+Create a dedicated reading screen with an uncluttered, book-centered experience.
+
+Support:
+
+* Continuous, smooth scrolling.
+* Single-page and double-page modes where suitable.
+* Previous-page and next-page navigation, with subtle page-turn animations where appropriate.
+* A navigable table of contents, including nested chapters and sections when available.
+* A progress slider or equivalent navigation control for quickly moving through a book.
+* Useful navigation feedback, such as the current chapter, page where applicable, and overall progress.
+* Configurable progress indicators, including percentage, page count, chapter progress, elapsed reading/listening time, and estimated time remaining where meaningful.
+* Search within the current book when practical.
+* Restoration of the last reading position when the book is reopened.
+
+Keep document location distinct from presentation layout. A page number can change when font size, viewport dimensions, or pagination changes, so do not rely on page numbers alone to represent persistent reading positions.
+
+D. Reading customization
+
+Allow users to customize the reading experience, including:
+
+* Font size.
+* Line height.
+* Paragraph spacing.
+* Background and text color through coordinated themes.
+* Light, dark, and other comfortable reading themes.
+* Scrolling versus paginated reading.
+* Relevant typography options where supported by the document format.
+
+Preserve source formatting by default for formatted documents. Let users choose when to override it.
+
+Provide a way to reset customization to sensible defaults or the original appearance.
+
+E. Bookmarks, highlights, and notes
+
+Support bookmarks and text annotations as core reading features.
+
+Users should be able to:
+
+* Bookmark their current reading location.
+* Select text and create a highlight or note.
+* Highlight text within a paragraph, across paragraph boundaries, or at the beginning or end of a passage.
+* Associate notes with selected passages.
+* View bookmarks, highlights, and notes in dedicated navigable lists.
+* Jump from an annotation or bookmark to its corresponding location in the book.
+* Remove or edit their annotations.
+* Navigate among annotations without losing the current reading context unnecessarily.
+
+Establish a reasonable configurable or documented limit for the length of a single highlighted passage or attached note. Handle oversized selections gracefully rather than allowing pathological content to degrade performance.
+
+Use stable document anchors and source-text offsets or equivalent location information. Annotations should survive normal navigation and, where possible, changes to typography and layout.
+
+Design the data model so highlights and notes can eventually be exported, synchronized, or shared independently of the original book.
+
+F. Independent panels and responsive UX
+
+Treat the reading surface, reading customization, navigation and annotation lists, and playback controls as related but independently manageable parts of the experience.
+
+The interface should accommodate at least these conceptual areas:
+
+* Reader and document navigation.
+* Reading settings and appearance.
+* Table of contents, bookmarks, highlights, and notes.
+* Text-to-speech playback controls.
+
+Do not require all panels to remain visible simultaneously.
+
+On desktop, use an appropriate combination of sidebars, collapsible panels, toolbars, and overlays. On iPhone-sized screens, use compact controls, drawers, sheets, or other platform-appropriate navigation patterns.
+
+Users should be able to open a panel, inspect or edit its contents, and return to reading without losing their place or unnecessarily interrupting speech.
+
+Long lists of chapters, bookmarks, and annotations should navigate intelligently. When opening a list, bring the entry nearest to the current reading location into view when practical, while keeping other entries discoverable.
+
+An important interaction: if speech is playing from one location and the user browses elsewhere in the book, provide an obvious way to return to the active speech position, such as a “Back to reader” or “Return to current reading” action.
+
+Distinguish the visible browsing location from the active playback location. Moving the reading viewport must not silently change playback, and initiating playback at a new location must deliberately update the active reading position.
+
+Make panel transitions, navigation, and reading interactions smooth and predictable without excessive animation.
+
+G. Text-to-speech and listening
+
+Provide a functional text-to-speech experience in Stage One.
+
+Include:
+
+* Play and pause controls.
+* Resume from the saved position.
+* A reasonable initial free voice using a supported speech engine.
+* Voice selection where multiple usable voices are available.
+* Playback speed selection.
+* Previous-sentence and next-sentence navigation.
+* Starting playback from a selected passage or the user’s chosen text position.
+* Automatic continuation through the book where the speech engine supports it.
+* Persistent per-book playback position and voice/speed preferences.
+* Appropriate playback state indicators.
+* Sentence-level highlighting synchronized with speech where the engine provides sufficient timing information.
+* Word or character-level highlighting when reliable timing events are available.
+
+Use the first sentence or beginning of the book when the user starts playback for the first time without a specified position. Resume from the last saved position on subsequent sessions unless the user explicitly chooses another starting location.
+
+If a user starts playback from another location while speech is already playing, stop or replace the previous playback cleanly and begin at the new location.
+
+Users must be able to create bookmarks, highlights, and notes while speech continues. These interactions must not unnecessarily interrupt or reset playback.
+
+Account for language differences and mixed-language books. Detect the likely language of the text, preferably at sentence or segment level where appropriate, and use a compatible voice when possible. A language indicator or flag may be used as a helpful UI cue, but do not assume that an entire book has only one language.
+
+Be transparent about browser and operating-system speech limitations. Do not simulate accurate word synchronization with unreliable timing estimates.
+
+Design a speech-provider abstraction so future voice providers can be integrated without rewriting the reader.
+
+H. Persistence and reliability
+
+The prototype must preserve the user’s library, reading progress, preferences, bookmarks, highlights, and notes across ordinary refreshes and application restarts.
+
+Choose appropriate local persistence for the platform and size of the content. Avoid treating browser memory as durable storage.
+
+Provide clear handling for import failures, corrupted files, unavailable voices, interrupted processing, and missing document text.
+
+Do not lose existing annotations merely because the user changes font size, changes a theme, switches reading modes, or navigates between panels.
+
+5. Stage Two: Native Mobile and Production-Quality Reading
+
+After the core web workflow works, refine it and implement the native iPhone experience.
+
+Priorities include:
+
+* Native file importing and the iOS share sheet where feasible.
+* A reading interface optimized for touch and small screens.
+* Reliable background audio, lock-screen controls, headphone controls, and audio interruption handling where supported.
+* Better sentence and word synchronization through suitable speech engines.
+* More robust EPUB and PDF selection and annotation behavior.
+* Offline reading and durable local storage.
+* Import recovery, duplicate management, accessibility, and keyboard/screen-reader support.
+* Improved performance for long books and large PDFs.
+* Automated testing across representative file formats and viewport sizes.
+
+Reuse shared domain logic and types between web and mobile where beneficial, but do not force platform-specific interactions into a lowest-common-denominator interface.
+
+Do not mark this stage complete solely because the app runs in a mobile browser. The eventual native iPhone experience must be evaluated on its own platform.
+
+6. Stage Three: Cloud Library and Cross-Device Synchronization
+
+Design for cloud functionality from the beginning, but defer a full community catalog and production cloud service until the core reader is stable.
+
+The future architecture should accommodate:
+
+* User accounts and authentication.
+* Private cloud storage for imported books.
+* Cross-device synchronization of library metadata, reading positions, preferences, bookmarks, highlights, and notes.
+* Upload and download status, conflict handling, and recovery from interrupted transfers.
+* Book metadata and version management.
+* Optional sharing of selected books and associated annotations.
+* Searching for books that have been shared with the user or made available through a permitted catalog.
+* Downloading a shared book to a local library.
+* Clear controls for private, shared, and public content.
+
+Separate a user’s library entry from the underlying stored file and from any community catalog entry.
+
+Deleting a book from a personal library should not automatically delete a shared community copy or another user’s independent library entry. Use explicit ownership, references, and retention rules to manage stored files.
+
+When replacing an uploaded book, validate the new version before switching the user’s active copy. Preserve or discard older versions according to a clear retention policy.
+
+Cloud upload should not imply public sharing. Community participation must be explicit, with privacy controls and an appropriate copyright and takedown process.
+
+Allow community annotations to be shared separately from the book. Consider annotation ownership, attribution, visibility, edit permissions, and whether an annotation refers to a particular book version.
+
+Implement the architecture needed to support these concepts without building the entire cloud-sharing product in Stage One.
+
+7. Stage Four: AI and Advanced Monetization
+
+Leave clean integration points for future features such as:
+
+* AI explanations of selected text.
+* Contextual questions about a book or passage.
+* Summaries and chapter explanations.
+* More natural or specialized speech voices.
+* Premium voices, usage-based credits, or in-app purchases where supported.
+* User dictionaries and pronunciation corrections.
+* OCR and additional document-format support.
+* Advanced reading analytics and exportable annotations.
+
+Future-only features should be visibly labeled as coming soon and should not expose nonfunctional controls that appear to work.
+
+Do not require paid AI services or premium voice APIs to demonstrate the Stage One prototype. Use free, local, browser-native, or otherwise appropriately available capabilities where practical, while keeping provider-specific code isolated.
+
+8. Design and Product Quality
+
+Aim for a polished, calm, reading-first interface rather than a generic dashboard.
+
+The library should feel like a personal bookshelf. The reader should give the text room to breathe. Controls should be easy to discover without competing with the book for attention.
+
+Use thoughtful typography, spacing, clear hierarchy, restrained animation, meaningful empty states, and helpful error messages.
+
+Make the most common actions straightforward: import a book, open it, resume reading, start listening, save a passage, and return to the current reading position.
+
+Avoid excessive settings on the main reading surface. Place secondary controls in well-organized panels.
+
+Keep the desktop and mobile experiences visually related but interaction-appropriate for their platforms.
+
+9. Engineering Expectations
+
+Before implementation:
+
+1. Inspect the existing repository, package manager, scripts, and current application structure.
+2. Identify existing functionality worth preserving.
+3. Select a reasonable architecture and document important decisions.
+4. Establish a representative test corpus or fixtures for TXT, EPUB, PDF, and mixed-language text.
+
+During implementation:
+
+* Work in small, coherent stages.
+* Use strict TypeScript where practical.
+* Keep document rendering, speech playback, annotations, library management, and UI state separated into understandable modules.
+* Define stable domain models for books, document locations, reading progress, bookmarks, highlights, notes, playback preferences, and future cloud references.
+* Handle loading, empty, error, and recovery states.
+* Include automated tests for important logic and user workflows.
+* Avoid unnecessary dependencies and excessive abstractions.
+* Do not leave core Stage One actions as static buttons or fake interactions.
+* Use realistic sample content and verify actual file rendering rather than relying exclusively on mock data.
+
+At the end of each stage, report what was implemented, what remains incomplete, important limitations, and how to run and test the application.
+
+10. Definition of Done for Stage One
+
+The first stage should be considered successful when a user can:
+
+1. Import several supported books and see each file’s processing status independently.
+2. Paste text and create a usable temporary book.
+3. Open EPUBs while retaining their formatting and view PDFs in their original page layout.
+4. Adjust supported reading settings and navigate chapters and pages.
+5. Save bookmarks, highlights, and notes, then navigate back to them.
+6. Start, pause, resume, and reposition text-to-speech playback.
+7. See synchronized sentence highlighting when supported by the speech engine.
+8. Continue using reading controls and annotations without unnecessarily interrupting speech.
+9. Return to the active playback position after browsing another location.
+10. Close and reopen the application without losing the library, annotations, preferences, or reading progress.
+11. Use the responsive web application comfortably on desktop and mobile-sized screens.
+12. Run the project and its relevant tests using documented instructions.
+
+Treat unsupported capabilities honestly and document them rather than claiming full compatibility.
+
+Final Instruction
+
+Begin by examining the existing project and proposing a concise implementation plan for Stage One, including key architectural decisions and risks. Then proceed with implementation in coherent increments, validating each increment before moving on.
+
+Use your judgment to fill gaps in the product specification. Prioritize the most valuable working end-to-end experience, preserve the flexibility needed for later stages, and avoid implementing future-stage complexity prematurely.
